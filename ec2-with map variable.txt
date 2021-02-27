@@ -1,0 +1,25 @@
+provider "aws" {
+  region = var.my-region
+
+
+}
+
+
+resource "aws_instance" "terraform-example" {
+  subnet_id              = "${aws_subnet.ec2-subnet.id}"
+  vpc_security_group_ids = ["${aws_security_group.ec2-sg.id}"]
+  key_name               = "${aws_key_pair.us-east-2-region-key-pair.id}"
+  //ami                    = var.ami_id[var.my-region]
+  ami                    = lookup(var.ami_id, var.us-regions["us-region-2"])
+  instance_type          = "t2.micro"
+  tags = {
+    Name = "ec2-terraform-example"
+  }
+  user_data = <<-EOF
+              #!/bin/bash
+              yum install httpd -y
+              echo "Hi this is terraform script" > /var/www/html/index.html
+              service httpd start
+              EOF
+
+}

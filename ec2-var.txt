@@ -1,0 +1,116 @@
+provider "aws" {
+ region = var.my-region
+
+
+}
+
+
+resource "aws_instance" "terraform-example" {
+    subnet_id = "${aws_subnet.ec2-subnet.id}"
+    vpc_security_group_ids = ["${aws_security_group.ec2-sg.id}"]
+    key_name = "${aws_key_pair.us-east-2-region-key-pair.id}"
+    ami = "ami-03eb358c15bd8"
+    instance_type = "t2.micro"
+    tags = {
+    Name = "ec2-terraform-example"
+  }
+    user_data = <<-EOF
+              #!/bin/bash
+              yum install httpd -y
+              echo "Hi this is terraform script" > /var/www/html/index.html
+              service httpd start
+              EOF
+
+}
+
+
+resource "aws_security_group" "ec2-sg" {
+  vpc_id = "${aws_vpc.ec2-vpc.id}"
+  ingress {
+    from_port = 0
+    to_port = 0
+    protocol = "tcp"
+    cidr_blocks = [ "0.0.0.0/0" ]
+  }
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port = 80
+    to_port = 80
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "ec2-sg"
+  }
+
+}
+resource "aws_vpc" "ec2-vpc" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "my-vpc"
+  }
+}
+
+resource "aws_subnet" "ec2-subnet" {
+  vpc_id     = aws_vpc.ec2-vpc.id
+  cidr_block = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "ec2-subnet"
+  }
+}
+
+// Internet Gateway
+
+resource "aws_internet_gateway" "ec2-igw" {
+    vpc_id = "${aws_vpc.ec2-vpc.id}"
+    tags = {
+        Name = "ec2-igw"
+    }
+}
+
+// Route Table
+
+resource "aws_route_table" "ec2-public-crt" {
+    vpc_id = "${aws_vpc.ec2-vpc.id}"
+
+    route {
+        //associated subnet can reach everywhere
+        cidr_block = "0.0.0.0/0"
+        //CRT uses this IGW to reach internet
+        gateway_id = "${aws_internet_gateway.ec2-igw.id}"
+    }
+
+    tags = {
+        Name = "ec2-public-crt"
+    }
+}
+
+// Associate CRT to Subnet
+
+resource "aws_route_table_association" "ec2-crta-public-subnet-1"{
+    subnet_id = "${aws_subnet.ec2-subnet.id}"
+    route_table_id = "${aws_route_table.ec2-public-crt.id}"
+}
+
+// Sends your public key to the instance
+resource "aws_key_pair" "us-east-2-region-key-pair" {
+    key_name = "my-key-pair"
+    public_key = "ssh-rsa AAAAB3NzaC1yc2EAABAAAQC6RrHPHDLZiDOGS2ARw4J/7ZeEptInrk9tK49PBmqoIZuL05Go5TQZQVpf/iywbP3v5woqYOYMdLxLV19E7y1xKA8zAKnE70gLkuf7Gu272MkScEPqHemkJirNq7DVBxIWusA5BVu9egxcZQ1bojDxyirSDs2w9ubkOSoSe8WPT9wJL0hlJWH5ySIIVJq8lIE6v33w+bNYTaAqn1+L7k/8QJQZZ7qVGGKn5No1FuLn0HXhLQ3JDuyavsNNFnodnvFG40HWrPUgsqHzxMnjUQvn0LTuUwVnjfHY6658vvOz5bew9I5Pz5f7JVw9DEp8PuZTlOMCap1WFDipH7tow73wZO4Jbt/RuLP61iNmDbiyDXJ3+uCDZHIhJXJ+1vLBw84WeZbY6ctu4tF37I54yE6B69m9D164VhBXe+E0lmhto0jiknnX3GFwezvZCPWkpK/2vS4BT0PjseonWJhLyteNhoHHBu30iRT6PWFUeShn4vj8Y3S5Iqkjhz0ZtiDDE0WHWStOTgu4ymri1s9T8WrJwacbVP/8M253VaYbse+a6v4XyXttz/MuETL5ud3Fzu2horTqa7PJ9ab4ruYcXT3i3Xj8APITU+aU1z0SQ/o7Gjtl11mfWo7flWDPeBh2IjTeyFCRVX/g9QICid6Lxn8eOjUgtnaygyDR9tIvJrfVVQ=="
+}

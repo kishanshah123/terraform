@@ -1,0 +1,123 @@
+provider "aws" {
+ region = "us-east-2"
+
+
+}
+
+
+resource "aws_instance" "terraform-example" {
+    subnet_id = "${aws_subnet.ec2-subnet.id}"
+    vpc_security_group_ids = ["${aws_security_group.ec2-sg.id}"]
+    key_name = "${aws_key_pair.us-east-2-region-key-pair.id}"
+    ami = "ami-03eb35868"
+    instance_type = "t2.micro"
+    tags = {
+    Name = "ec2-terraform-example"
+  }
+    user_data = <<-EOF
+              #!/bin/bash
+              yum install httpd -y
+              echo "Hi this is terraform script" > /var/www/html/index.html
+              service httpd start
+              EOF
+
+}
+
+
+resource "aws_security_group" "ec2-sg" {
+  vpc_id = "${aws_vpc.ec2-vpc.id}"
+  ingress {
+    from_port = 0
+    to_port = 0
+    protocol = "tcp"
+    cidr_blocks = [ "0.0.0.0/0" ]
+  }
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port = 80
+    to_port = 80
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "ec2-sg"
+  }
+
+}
+resource "aws_vpc" "ec2-vpc" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "my-vpc"
+  }
+}
+
+resource "aws_subnet" "ec2-subnet" {
+  vpc_id     = aws_vpc.ec2-vpc.id
+  cidr_block = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "ec2-subnet"
+  }
+}
+
+// Internet Gateway
+
+resource "aws_internet_gateway" "ec2-igw" {
+    vpc_id = "${aws_vpc.ec2-vpc.id}"
+    tags = {
+        Name = "ec2-igw"
+    }
+}
+
+// Route Table
+
+resource "aws_route_table" "ec2-public-crt" {
+    vpc_id = "${aws_vpc.ec2-vpc.id}"
+
+    route {
+        //associated subnet can reach everywhere
+        cidr_block = "0.0.0.0/0"
+        //CRT uses this IGW to reach internet
+        gateway_id = "${aws_internet_gateway.ec2-igw.id}"
+    }
+
+    tags = {
+        Name = "ec2-public-crt"
+    }
+}
+
+// Associate CRT to Subnet
+
+resource "aws_route_table_association" "ec2-crta-public-subnet-1"{
+    subnet_id = "${aws_subnet.ec2-subnet.id}"
+    route_table_id = "${aws_route_table.ec2-public-crt.id}"
+}
+
+// Sends your public key to the instance
+resource "aws_key_pair" "us-east-2-region-key-pair" {
+    key_name = "us-east-2-region-key-pair"
+    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAABAQCfmclsj6RltZ5vbSKoGqv4NMAP+nMiytuQqjcL5EGgUaR8bj16VmJcWGQizAjFJjtpr+Cnw7nv7LxIusuPhnc5Kg1IV2/w7ayCvZhc6Q6Pfq//jo2g9edlPI+o7kGmopw58d/XwX2bx2IoRi0LqzO1IMq5uX0P7cR3zlbva6S/I9GYCCa4hlxtRHAs02SOjArPYvX72RFa+mSFFm9z1NzyyZ3O5aIbjg8JNP8oORfOdUBbjoRc4Ytz2EZIgvRO5k/HB3jXJG+teDwGwHou8HPswE9Q8WLuKGDJafrGBPtrd5zIiDhdoQk2LxKAvmIY4wgX2tY0iF3d8cYtwDeZnqgf"
+}
+
+
+
+
+
+
+

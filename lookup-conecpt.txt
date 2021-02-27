@@ -1,0 +1,22 @@
+ami                    = lookup(var.ami_id, var.us-regions["us-region-2"])
+
+
+lookup(var.1, var.2)
+
+
+step1.
+lookup(var.ami_id, var.us-regions["us-region-2"])
+
+step2.
+lookup(var.ami_id, us-east-2)
+
+step3.
+lookup(var.ami_id["us-east-2"])
+
+step4.
+ami-03eb3586c63c15bd8
+
+
+file
+local-exec
+remote-exec

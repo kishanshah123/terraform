@@ -1,0 +1,141 @@
+provider "aws" {
+ region = var.my-region
+
+
+}
+
+
+resource "aws_instance" "terraform-example" {
+    subnet_id = "${aws_subnet.ec2-subnet.id}"
+    vpc_security_group_ids = ["${aws_security_group.ec2-sg.id}"]
+    key_name = "${aws_key_pair.ec2-key.id}"
+    ami = "ami-03eb3586c615bd8"
+    instance_type = "t2.micro"
+    tags = {
+    Name = "ec2-terraform-example"
+  }
+#   user_data = <<-EOF
+#              #!/bin/bash
+#              yum install httpd -y
+#              echo "Hi this is terraform script" > /var/www/html/index.html
+#              service httpd start
+#              EOF
+
+provisioner "file" {
+ source = "/root/kishan-terraform/index.html"
+ destination = "/tmp/index.html"
+}
+
+provisioner "remote-exec" {
+  inline = [
+  "sudo yum install httpd -y",
+  "sudo systemctl start httpd",
+  "sudo cp /tmp/index.html /var/www/html",
+  "sudo systemctl restart httpd"
+]
+}
+connection {
+  host = self.public_ip
+  user = "ec2-user"
+  type = "ssh"
+  private_key = file("./ec2-key")
+ }
+
+
+}
+
+
+resource "aws_security_group" "ec2-sg" {
+  vpc_id = "${aws_vpc.ec2-vpc.id}"
+  ingress {
+    from_port = 0
+    to_port = 0
+    protocol = "tcp"
+    cidr_blocks = [ "0.0.0.0/0" ]
+  }
+
+  ingress {
+    from_port = 22
+    to_port = 22
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port = 80
+    to_port = 80
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "ec2-sg"
+  }
+
+}
+resource "aws_vpc" "ec2-vpc" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "my-vpc"
+  }
+}
+
+resource "aws_subnet" "ec2-subnet" {
+  vpc_id     = aws_vpc.ec2-vpc.id
+  cidr_block = "10.0.1.0/24"
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "ec2-subnet"
+  }
+}
+
+// Internet Gateway
+
+resource "aws_internet_gateway" "ec2-igw" {
+    vpc_id = "${aws_vpc.ec2-vpc.id}"
+    tags = {
+        Name = "ec2-igw"
+    }
+}
+
+// Route Table
+
+resource "aws_route_table" "ec2-public-crt" {
+    vpc_id = "${aws_vpc.ec2-vpc.id}"
+
+    route {
+        //associated subnet can reach everywhere
+        cidr_block = "0.0.0.0/0"
+        //CRT uses this IGW to reach internet
+        gateway_id = "${aws_internet_gateway.ec2-igw.id}"
+    }
+
+    tags = {
+        Name = "ec2-public-crt"
+    }
+}
+
+// Associate CRT to Subnet
+
+resource "aws_route_table_association" "ec2-crta-public-subnet-1"{
+    subnet_id = "${aws_subnet.ec2-subnet.id}"
+    route_table_id = "${aws_route_table.ec2-public-crt.id}"
+}
+
+// Sends your public key to the instance
+resource "aws_key_pair" "ec2-key" {
+    key_name = "ec2-key"
+    public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAWgJ7z8JFQuIPKp3hSqWF5+NGsVqzfRWLFDUafcAbnYrK3u/VYtOtxnCYry0KU3r9uXNiSWxtMaB1qxi+17ZlqCvXZBFTk0k7VQssU7cw/5eWyQptqajPYFSqdCUArWd0UB26ccszBZ/z72cUUTAZClTrYPZZn06dKYFOs3q0JX86z44RTd14BOzM/udv8ZZ2tWGC00VLVw5l2rnn2x+DaPNyAJq8d2PK2b8/VbMAXwfRnBTMwgXlOXIUyPxzT+ueXgkwyjJ2lTa4bOG7eKpGehGwFOSDKBSpch0kGiBPpeMtHn349m1QiIRiqlubhiUCtU+h6qEDc4We07 root@ip-172-31-17-8.us-east-2.compute.internal"
+}
+
+output "ec2-ip" {
+ value = aws_instance.terraform-example.public_ip
+}
