@@ -1,0 +1,72 @@
+provider "aws" {
+  region = var.us-regions["us-region-2"]
+
+
+}
+
+
+resource "aws_instance" "terraform-example" {
+  count         = "${var.instance_count}"
+  subnet_id              = "${aws_subnet.ec2-subnet.id}"
+  vpc_security_group_ids = ["${aws_security_group.ec2-sg.id}"]
+  key_name               = "${aws_key_pair.us-east-2-region-key-pair.id}"
+  //ami                    = var.ami_id[var.my-region]
+  ami                    = lookup(var.ami_id, var.us-regions["us-region-2"])
+  instance_type          = "t2.micro"
+  tags = {
+    Name = "${element(var.instance_tags, count.index)}"
+  }
+}
+
+resource "null_resource" "cluster" {
+ count = "${var.instance_count}"
+ connection {
+
+    host = element(aws_instance.terraform-example.*.public_ip, count.index)
+    type = "ssh"
+    user = "ec2-user"
+    private_key = "${file("./kishan")}"
+    timeout = "2m"
+    agent = false
+  }
+  provisioner "remote-exec" {
+    inline = [
+        "sudo yum install httpd -y",
+        "sudo chmod 777 /var/www/html/index.html",
+        "echo HI > /var/www/html/index.html",
+        "sudo systemctl start httpd",
+        "sudo systemctl status httpd"
+    ]
+  }
+}
+=================================================================================
+
+variable "my-region" {
+  type = string
+}
+
+variable "ami_id" {
+  type = map
+  default = {
+    "us-east-1" = "ami-01aab85a5e4a5a0fe"
+    "us-east-2" = "ami-01aab85a5e4a5a0fe"
+  }
+}
+
+variable "us-regions" {
+
+ type = map
+ default = {
+
+   "us-region-2" = "us-east-2"
+ }
+}
+
+variable "instance_count" {
+  default = "2"
+}
+
+variable "instance_tags" {
+  type = "list"
+  default = ["my-terraform-1", "my-terraform-2"]
+}
