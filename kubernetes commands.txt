@@ -1,0 +1,47 @@
+Pod life cycle:
+1. Pending: images is being downloded
+2. running: pod is schdeule on the node & atleast one container is running
+3. succeeded: all the container is running
+4. failed: all the container of the pod have exited and atleast one container has returned a non-zero status
+4. crashloopbackoff: the conatiner fails to start & tried again & again.
+5. imagepullbackoff: image not found
+
+Init Container:
+
+init container are container which run before the main application container runs.
+
+kubectl get all
+kubectl get all --show-labels
+kubectl get all --selectors='app=db'
+kubectl exec -it podname --container conrainername /bin/bash
+kubectl create -f file.yml
+kubectl delete -f file.yml
+kubectl get deployments
+
+Kubernetes Update stetergy
+1. recreate
+2. rolling update
+i) maxunavailable
+ii) max surge
+
+kubectl replace -f file.yaml
+
+Kubernetes maintain the revision number for each changes in deployment.
+kubectl rollout history deployment
+
+Want to see the changes in deployment.
+kubectl rollout history deployment deploymentname --revision=2
+
+
+If we want to roll back to a perticular revision number.
+kubectl rollout undo deployment deployment-name --to-revision=1
+
+Diff b/w replica set & replication controller
+Main difference is lable & update stratergy
+replicaset has set based & rc has equality based selector.
+
+
+
+
+
+
