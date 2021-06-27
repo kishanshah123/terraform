@@ -1,0 +1,12 @@
+data "aws_ami" "app_ami"{
+   most_recent = true
+   owners = ["amazon"]
+   filter {
+      name = "name"
+      values = ["Ami name"]
+   }
+}
+
+How to call this data sourse:
+
+ami = data.aws_ami.app_ami.id

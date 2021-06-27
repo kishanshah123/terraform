@@ -1,0 +1,102 @@
+###################################################################################################################################################
+      Creating VPC from Module, vpc creating 3 subnet. then launching ec2 in random public subnet. 
+###################################################################################################################################################
+
+provider "aws" {
+  profile = "default"
+  region  = "us-east-2"
+}
+
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+
+  name = "my-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["us-east-2a", "us-east-2b", "us-east-2c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+  enable_nat_gateway = true
+  enable_vpn_gateway = true
+
+  tags = {
+    Terraform   = "true"
+    Environment = "dev"
+  }
+}
+
+resource "aws_security_group" "my-sg" {
+  vpc_id = module.vpc.vpc_id
+  ingress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "ec2-sg"
+  }
+  provisioner "local-exec" {
+    command = "echo 'Hi I am security group'"
+  }
+
+}
+
+resource random_id index {
+  byte_length = 1
+}
+
+locals {
+  subnet_ids_list = tolist(module.vpc.public_subnets)
+  subnet_ids_random_index = random_id.index.dec % length(module.vpc.public_subnets)
+  instance_subnet_id = local.subnet_ids_list[local.subnet_ids_random_index]
+}
+
+resource "aws_instance" "test-ec2" {
+  ami                    = "ami-01aab85a5e4a5a0fe"
+  subnet_id              = local.instance_subnet_id
+  key_name               = "kubernetes"
+  instance_type          = "t2.micro"
+  vpc_security_group_ids = ["${aws_security_group.my-sg.id}"]
+  tags = {
+    Name = "terraform-ec2"
+  }
+}
+
+output "ec2-subnet" {
+    value = aws_instance.test-ec2.subnet_id
+}
+
+output "public-subnet" {
+    value = module.vpc.public_subnets
+}
+
+
+
+
+
+
+
+

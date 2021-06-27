@@ -1,0 +1,208 @@
+---------------------------------------------------------------------------------------
+Terraform:
+
+Terraform is the infrastructure as code offering from HashiCorp. It is a tool for building, changing, 
+and managing infrastructure in a safe, repeatable way. 
+
+
+Terraform Command:
+1.terraform init-->to first initilized the plugin
+2.terraform validate-->to validate the syntex of main.tf files.
+3.terraform fmt-->it check the extra spaces in tf files.
+4.terraform plan--> it will show the dry run
+5.terraform apply
+6.terraform show-->
+7.terraform apply --auto-approve
+8.terraform destroy-->
+9.terraform state list-->to list all the created resource
+--------------------------------------------------------------------------------------------------------
+Variable & Function:
+
+Map type:
+
+variable "ami_id" {
+  type = map
+  default = {
+    "us-east-1" = "ami-01aab85a5e4a5a0fe"
+    "us-east-2" = "ami-01aab85a5e4a5a0fe"
+  }
+}
+
+variable "us-regions" {
+
+ type = map
+ default = {
+
+   "us-region-2" = "us-east-2"
+ }
+}
+
+variable "instance_count" {
+  default = "3"
+}
+
+variable "instance_tags" {
+  type = "list"
+  default = ["my-terraform-1", "my-terraform-2"]
+}
+
+How to call the ami in main.tf file:-------------------------------------------
+ami = var.ami_id[var.my-region]
+
+ami = lookup(var.ami_id, var.us-regions["us-region-2"])
+lookup function is used to search the value form map kind type variable.
+
+
+How to define tag on multiple instance:---------------------------------------------------------------
+tags = {
+    Name = "${element(var.instance_tags, count.index)}"
+  }
+element func is use to get the vaule form the list on the basis of index count.
+
+
+How to print public ip of the the instance:-----------------------------------------------------------
+provisioner "local-exec" {
+  command = "echo '${aws_instance.terraform-example.*.public_ip}'"
+ }
+
+
+If we want to run commands on remote machine:----------------------------------------------------------
+we have to create null resourse & inside it we have to define connection & remote-exec provisioner.
+
+resource "null_resource" "cluster" {
+ count = "${var.instance_count}"
+ connection {
+
+    host = element(aws_instance.terraform-example.*.public_ip, count.index)
+    type = "ssh"
+    user = "ec2-user"
+    private_key = "${file("./kishan")}"
+    timeout = "2m"
+    agent = false
+  }
+  provisioner "remote-exec" {
+    inline = [
+        "sudo yum install httpd -y",
+        "sudo systemctl start httpd",
+        "sudo systemctl status httpd"
+    ]
+  }
+  provisioner "local-exec" {
+  command = "echo 'Hi I am null_resorce'"
+ }
+}
+
+-------------------------------------------------------------------------------------
+Creating Instance with key pair:
+
+provider "aws" {
+  region = "us-east-2"
+}
+
+resource "aws_instance" "test-ec2" {
+  ami                    = "ami-01aab85a5e4a5a0fe"
+  key_name               = aws_key_pair.ec2-key.id
+  instance_type          = "t2.micro"
+  vpc_security_group_ids = ["sg-02b7c59e5f11da845"]
+  tags = {
+    Name = "terraform-ec2"
+  }
+}
+
+resource "aws_key_pair" "ec2-key" {
+  key_name   = "ec2-key"
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDcV7EQQsgqLCKW1l/zC+jjLl6xaaebw2qvmgRZ3/i45n4PgJ3jPR+84eAGzFzQklKMBccNfCjuXpDp4wusX+jJ8g2TTKUj8zJNuVmtYJ4DNmP5M2Ynfo87ov2iSB762B76zHgpQVoyFh/uacT1G6Is7DQP1woyrKtUSWhRECZDkHi5GYQaAf92vHbMsIdqwZe5T3cSYPLmf3CTzADZHGeik6dbeTaDfgkqiYpBrfhHLTb+IgAPh7sk4L4EN13KMPSTspIlHUhF33Bm16eYe3EsHpA2A6Nppmn9T1OD8nR7Al+Flvyoot4rieBtYhsMAh/HVD/Y5fkTeILIPgVbkxFn kishan@DESKTOP-VOSE0BS"
+}
+
+-----------------------------------------------------------------------------------------------------------------------------------
+
+Provisioner:
+
+provisioners let you upload files, run shell scripts, or install and trigger other software like configuration management tools, etc.
+
+resource "aws_key_pair" "example" {
+  key_name = "examplekey"
+  public_key = file("~/.ssh/id_rsa.pub")
+}
+
+resource "aws_instance" "web" {
+  key_name = aws_key_pair.example.key_name
+  # ...
+
+ connection {
+    type     = "ssh"
+    user     = "centos"
+    private_key = file("~/.ssh/id_rsa")
+    host     = self.public_ip
+
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum -y install httpd",
+   "sudo systemctl start httpd"
+    ]
+  }
+
+-----------------------------------------------------------------------------------------------------------------------
+
+Explicit Dependency:
+
+Let suppose if once resource is dependent on another resourse for example
+we want to create s3 bucket & ec2 instance, and ec2 instance is dependent on s3 bucket.
+so we want s3 bucket will be created first then ec2. then we use this dependent option.
+
+resource "aws_s3_bucket" "example" {
+bucket = "terraform-getting-started-guide"
+  acl    = "private"
+}
+ 
+
+resource "aws_instance" "example" {
+  ami           = "ami-2757f631"
+  instance_type = "t2.micro"
+
+  # Tells Terraform that this EC2 instance must be created only after the
+  # S3 bucket has been created.
+  depends_on = [“aws_s3_bucket.example”]
+}
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+Variable:
+
+if we dont want to pass the fixed value in main.tf files.
+then we use variable
+
+How to create variable:
+1.create variable.tf file
+mention all the variable in it for example.
+
+variable.tf 
+
+variable "ec2-region" {}
+variable "ami" {}
+variable "ec2-type" {}
+
+2.now pass the value of these variables in .tfvars file.
+
+ec2-region = "us-east-2"
+ami = "ami-01aab85a5e4a5a0fe"
+ec2-type = "t2.micro"
+
+3.now call these variable in main.tf file.
+
+provider "aws" {
+  region = var.ec2-region
+}
+
+resource "aws_instance" "test-ec2" {
+  ami                    = var.ami
+  instance_type          = var.ec2-type
+  vpc_security_group_ids = ["sg-02b7c59e5f11da845"]
+  tags = {
+    Name = "terraform-ec2"
+  }
+}
+
+------------------------------------------------------------------------------------------------------
