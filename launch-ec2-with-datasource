@@ -1,0 +1,39 @@
+provider "aws" {
+  region = "us-east-2"
+}
+
+data "aws_ami" "packer-image" {
+    filter {
+      name   = "root-device-type"
+      values = ["ebs"]
+    }
+
+    filter {
+      name   = "virtualization-type"
+      values = ["hvm"]
+    }
+    filter {
+      name   = "name"
+      values = ["packer-*"]
+    }
+    owners = ["self"]
+    most_recent = true
+}
+
+
+resource "aws_instance" "terraform-example" {
+#  ami           = "i-06672e51f781cfc1e"
+  ami           = data.aws_ami.packer-image.id
+  instance_type = "t2.micro"
+  tags = {
+    Name = "ec2-terraform-example"
+  }
+
+}
+output "Instance_id" {
+  value = aws_instance.terraform-example.id
+}
+
+output "packer-image-id" {
+  value = data.aws_ami.packer-image.id
+}
