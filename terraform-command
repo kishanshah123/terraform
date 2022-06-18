@@ -1,0 +1,33 @@
+terraform state list
+
+##to create alise to create resourse in multiple region##
+
+provider "aws" {
+  region = "us-east-2"
+  alias  = "prod"
+}
+
+provider "aws" {
+  region = "us-west-2"
+}
+
+resource "aws_instance" "test-ec2" {
+
+  ami           = "ami-0fa49cc9dc8d62c84"
+  instance_type = "t2.micro"
+  key_name      = "test-key"
+  provider      = aws.prod
+  tags = {
+    Name = "Hello world-test"
+  }
+
+}
+
+resource "aws_vpc" "ec2-vpc" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "my-vpc"
+  }
+}
