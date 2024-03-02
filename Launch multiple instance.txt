@@ -1,9 +1,6 @@
 provider "aws" {
   region = var.us-regions["us-region-2"]
-
-
 }
-
 
 resource "aws_instance" "terraform-example" {
   count         = "${var.instance_count}"
